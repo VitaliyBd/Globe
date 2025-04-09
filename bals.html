@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three Chrome & Glass Spheres with Adjustable Rings</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .dg.ac {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            opacity: 0.9;
+        }
+
+        .lil-gui {
+            /* --background-color: #000; */
+            /* --widget-color: #0af; */
+            --width: 300px;
+            --name-width: 50%;
+            margin: 10px;
+            padding: 10px;
+        }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(5, 5, 10);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+
+        const cubeTextureLoader = new THREE.CubeTextureLoader();
+        const envMap = cubeTextureLoader.load([
+            'https://threejs.org/examples/textures/cube/Bridge2/posx.jpg',
+            'https://threejs.org/examples/textures/cube/Bridge2/negx.jpg',
+            'https://threejs.org/examples/textures/cube/Bridge2/posy.jpg',
+            'https://threejs.org/examples/textures/cube/Bridge2/negy.jpg',
+            'https://threejs.org/examples/textures/cube/Bridge2/posz.jpg',
+            'https://threejs.org/examples/textures/cube/Bridge2/negz.jpg',
+        ]);
+        scene.background = envMap;
+
+        const goldMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            metalness: 1,
+            roughness: 0.1,
+            envMap: envMap
+        });
+
+        const chromeMaterial = new THREE.MeshStandardMaterial({
+            metalness: 1,
+            roughness: 0.05,
+            envMap: envMap
+        });
+
+        const glassMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            metalness: 0,
+            roughness: 0,
+            transmission: 1,
+            transparent: true,
+            ior: 1.5,
+            thickness: 2.0,
+            envMap: envMap
+        });
+
+        const hollowGlassMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            metalness: 0,
+            roughness: 0,
+            transmission: 1,
+            transparent: true,
+            ior: 1.5,
+            thickness: 0.1,
+            envMap: envMap
+        });
+
+        const geometry = new THREE.SphereGeometry(1, 64, 64);
+        const group = new THREE.Group();
+
+        for (let i = 0; i < 3; i++) {
+            const mesh = new THREE.Mesh(geometry, chromeMaterial);
+            const angle = (i / 5) * Math.PI * 2;
+            mesh.position.set(Math.cos(angle) * 3, 0, Math.sin(angle) * 3);
+            group.add(mesh);
+        }
+
+        const glassGroup = new THREE.Group();
+        const glassMesh = new THREE.Mesh(geometry, glassMaterial);
+        glassMesh.position.set(0, 0, 0);
+
+        let ringCount = 2;
+        let rings = [];
+        let ringSpeed = 0.01;
+        let ringThickness = 0.02; // Начальная толщина колец
+
+        function updateRings(count, thickness) {
+            rings.forEach(ring => glassGroup.remove(ring));
+            rings = [];
+
+            let currentRadius = 1.1; // Начальный радиус первого кольца
+            for (let i = 0; i < count; i++) {
+                const torus = new THREE.Mesh(
+                    new THREE.TorusGeometry(currentRadius, thickness, 32, 100),
+                    goldMaterial
+                );
+                torus.rotation.set(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                );
+                rings.push(torus);
+                glassGroup.add(torus);
+                currentRadius += thickness * 2; // Увеличиваем радиус на удвоенную толщину
+            }
+        }
+
+        updateRings(ringCount, ringThickness);
+
+        glassGroup.add(glassMesh);
+        glassGroup.position.set(
+            Math.cos(Math.PI * 1.2) * 3,
+            0,
+            Math.sin(Math.PI * 1.2) * 3
+        );
+        group.add(glassGroup);
+
+        const hollowGlassMesh = new THREE.Mesh(geometry, hollowGlassMaterial);
+        hollowGlassMesh.position.set(Math.cos(Math.PI * 1.6) * 3, 0, Math.sin(Math.PI * 1.6) * 3);
+        group.add(hollowGlassMesh);
+
+        scene.add(group);
+
+        for (let i = 0; i < 5; i++) {
+            const light = new THREE.PointLight(Math.random() * 0xffffff, 1, 20);
+            light.position.set(
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10
+            );
+            scene.add(light);
+        }
+
+        const gui = new GUI();
+        const params = {
+            ringCount: 2,
+            ringSpeed: 0.01,
+            ringThickness: 0.02, // Параметр толщины колец
+            ior: 1.5,
+            thickness: 2.0,
+            glassRoughness: 0,
+            goldRoughness: 0.1
+        };
+
+        gui.add(params, 'ringCount', 2, 16, 1).name('Number of Gold Rings').onChange(value => {
+            ringCount = value;
+            updateRings(ringCount, ringThickness);
+        });
+
+        gui.add(params, 'ringSpeed', 0, 0.05, 0.001).name('Gold Rings Rotation Speed').onChange(value => {
+            ringSpeed = value;
+        });
+
+        gui.add(params, 'ringThickness', 0.01, 0.1, 0.01).name('Gold Rings Thickness').onChange(value => {
+            ringThickness = value;
+            updateRings(ringCount, ringThickness);
+        });
+
+        gui.add(params, 'ior', 1.0, 2.5, 0.01).name('Index of Refraction (Glass)').onChange(value => {
+            glassMaterial.ior = value;
+            hollowGlassMaterial.ior = value;
+        });
+
+        gui.add(params, 'thickness', 0.01, 5.0, 0.01).name('Glass Thickness').onChange(value => {
+            glassMaterial.thickness = value;
+            hollowGlassMaterial.thickness = value;
+        });
+
+        gui.add(params, 'glassRoughness', 0, 1, 0.01).name('Roughness for Glass').onChange(value => {
+            glassMaterial.roughness = value;
+            hollowGlassMaterial.roughness = value;
+        });
+
+        gui.add(params, 'goldRoughness', 0, 1, 0.01).name('Roughness for Gold Rings').onChange(value => {
+            goldMaterial.roughness = value;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            group.rotation.y += 0.002;
+            group.rotation.x += 0.001;
+
+            rings.forEach(r => {
+                r.rotation.y += ringSpeed;
+                r.rotation.x += ringSpeed / 2;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
